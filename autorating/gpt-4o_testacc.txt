@@ -1,0 +1,4 @@
+The accuracy of gold reward given by gpt-4o on the test set of ultrafb_bin is 0.728515625
+The accuracy of gold reward given by gpt-4o on the test set of ultrafb_bin is 0.728515625
+The accuracy of gold reward given by gpt-4o on the test set of ultrafb_bin is 0.728515625
+The accuracy of gold reward given by gpt-4o on the test set of ultrafb_bin is 0.728515625
