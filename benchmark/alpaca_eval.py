@@ -13,7 +13,8 @@ import torch
 import tqdm
 import torch.multiprocessing as mp
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from utils.secret import kwapikey, step_apibase, step_apikey, deepseek_key
+from utils.secret import deepseek_key, deepseek_base, deepseek_model, kimi_base, kimi_key, kimi_model
+
 
 class AlpacaEval:
     def __init__(self, base_model_path="/data/models/Gemma-2-2B", 
@@ -163,28 +164,28 @@ class AlpacaEval:
         
 
 if __name__ == '__main__':
-    os.environ["DEEPSEEK_API_KEY"] = deepseek_key
-    os.environ["OPENAI_API_KEY"] = deepseek_key
+    os.environ["KIMI_KEY"] = kimi_key
+    os.environ["KIMI_BASE"] = kimi_base
+    os.environ["KIMI_MODEL"] = kimi_model
+
     # Reference sample
 
     ##################
-    mid_name = "gemma2-2b_ultrafb_bin"
+    mid_name = "gemma2-2b_hh_rlhf"
     base_model_path = "/data/models/Gemma-2-2B"
     reference_model_path = f"/data/models/sft_{mid_name}"
-    reference_model_tag = "latest_hf"
-    # alpaca_eval = AlpacaEval(base_model_path="/data/models/Gemma-2-2B", 
-    #                         policy_model_path="/data/models/sft_gemma2-2b_ultrafb_bin", 
-    #                         policy_model_tag="latest_hf",
+    reference_model_tag = "latest_hf"    
+    policy_model_labels = ['vanilla', 'WARM', 'ODIN', 'reg','meanstd', 'clip', 'minmax', 'lsc', 'PAR']
+    policy_model_tags = ["hreward_hf","hwin_hf"]
+
+    # alpaca_eval = AlpacaEval(base_model_path=base_model_path, 
+    #                         policy_model_path=reference_model_path, 
+    #                         policy_model_tag=reference_model_tag,
     #                         reference_model_path=reference_model_path,
     #                         reference_model_tag=reference_model_tag)
-    # # # alpaca_eval.sample_on_alpaca()
-    # alpaca_eval.eval_on_alpaca()
+    # alpaca_eval.sample_on_alpaca()
 
-    # policy_model_labels = ['vanilla', 'reg','WARM', 'ODIN', 'meanstd','clip','minmax','lsc','sigmoid','par']
-    policy_model_labels = ['WARM', 'ODIN']
-    policy_model_tags = ["hwin_hf", "hreward_hf"]
 
-    
     # for policy_model_label in policy_model_labels:
     #     for policy_model_tag in policy_model_tags:
     #         alpaca_eval = AlpacaEval(base_model_path=base_model_path, 
@@ -194,6 +195,17 @@ if __name__ == '__main__':
     #                                 reference_model_tag=reference_model_tag)
     #         alpaca_eval.sample_on_alpaca()
     
+
+
+
+    alpaca_eval = AlpacaEval(base_model_path=base_model_path, 
+                            policy_model_path=reference_model_path, 
+                            policy_model_tag=reference_model_tag,
+                            reference_model_path=reference_model_path,
+                            reference_model_tag=reference_model_tag)
+    alpaca_eval.eval_on_alpaca()
+
+
     for policy_model_label in policy_model_labels:
         for policy_model_tag in policy_model_tags:
             alpaca_eval = AlpacaEval(base_model_path=base_model_path, 

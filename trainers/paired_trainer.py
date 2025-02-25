@@ -171,9 +171,9 @@ class DPOTrainer(PairedPreferenceTrainer):
         
         # Note that the chosen rewards and rejected rewards are NOT given by reward model
         # They are calculated under the relationship between reward model and policy/reference model
-        chosen_logpderived_rewards = self.config.beta * (policy_chosen_logps - reference_chosen_logps).detach().clone()
-        rejected_logpderived_rewards = self.config.beta * (policy_rejected_logps - reference_rejected_logps).detach().clone()
-        losses = -F.logsigmoid(self.config.beta * logits)
+        chosen_logpderived_rewards = self.config.dpo_beta * (policy_chosen_logps - reference_chosen_logps).detach().clone()
+        rejected_logpderived_rewards = self.config.dpo_beta * (policy_rejected_logps - reference_rejected_logps).detach().clone()
+        losses = -F.logsigmoid(self.config.dpo_beta * logits)
 
         return losses, chosen_logpderived_rewards, rejected_logpderived_rewards
 
@@ -191,9 +191,9 @@ class IPOTrainer(PairedPreferenceTrainer):
 
         # Note that the chosen rewards and rejected rewards are NOT given by reward model
         # They are calculated under the relationship between reward model and policy/reference model
-        chosen_logpderived_rewards = self.config.tau * (policy_chosen_logps - reference_chosen_logps).detach()
-        rejected_logpderived_rewards = self.config.tau * (policy_rejected_logps - reference_rejected_logps).detach()
-        losses = (logits - 1/(2*self.config.tau))**2
+        chosen_logpderived_rewards = self.config.ipo_tau * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_logpderived_rewards = self.config.ipo_tau * (policy_rejected_logps - reference_rejected_logps).detach()
+        losses = (logits - 1/(2*self.config.ipo_tau))**2
 
         return losses, chosen_logpderived_rewards,  rejected_logpderived_rewards
 

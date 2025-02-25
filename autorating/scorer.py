@@ -7,15 +7,15 @@ from dataloaders.dataloader import get_ultrafb_bin, get_hh_rlhf
 
 class BasicScorer:
     """A class which use oracle preference model to score the responses given by policy model and sft model"""
-    def __init__(self, config):
+    def __init__(self, config, policy_exp_name):
         self.config = config
-        self.base_model_name = config.base_model_name
-        self.llm_model_name = config.llm_model_name
+        self.base_model_name = self.config.base_model_name
+        self.llm_model_name = self.config.llm_model_name
         self.dataset_name = self.config.dataset_name
-        self.num_workers = self.config.num_workers
+        self.num_workers = 7
         #dir names
         self.cache_dir = '/data/models'
-        self.policy_exp_name = self.config.policy_exp_name
+        self.policy_exp_name = policy_exp_name
         self.policy_sample_dir = os.path.join(self.cache_dir, self.policy_exp_name, 'sample_on_test')
 
     def process_test_set(self):

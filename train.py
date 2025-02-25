@@ -38,7 +38,7 @@ def build_trainer(config, tokenizer: AutoTokenizer, policy_engine, reward_engine
         train_split = 'train_sft'
         test_split = 'test_prefs'
     else:
-        if config.reward_discrete or config.reward_par or config.reward_lsc:
+        if config.reward_relative or config.reward_centered:
             train_split = config.model_name+'_train_prefs_plus' 
             test_split = config.model_name+'_test_prefs_plus'
         else:
@@ -106,7 +106,10 @@ def load_models(config):
     #This is the stage3 deepspeed config, it's the default deepspeed config for reference/reward/critic models
     #Since these models won't generate sentences during training, we can safely set the deepspeed zero optimization to stage-3
     stage3_config = json.load(open("configs/stage3_config.json"))
+    stage2_config = json.load(open("configs/stage2_config.json"))
     stage3_config = setup_dsconfig(stage3_config, config)
+    stage2_config = setup_dsconfig(stage2_config, config)
+
     # Define LoRA configuration
     lora_config = LoraConfig(
         r=8,  # Rank of the LoRA update matrices
@@ -130,9 +133,7 @@ def load_models(config):
             policy_model = get_peft_model(policy_model, lora_config)
         #Note that if we need the policy model to generate sentences we must set the zero stage of deepspeed to <=2
         #Because stage-3 will split the parameters of model, which will cause unacceptable network delay during generation procedure 
-        policy_config = json.load(open("configs/stage2_config.json")) if (config.online or config.sample_ontest or config.loss_name=='ppo' or config.loss_name=='gen_refs') else json.load(open("configs/stage3_config.json"))
-        policy_config = setup_dsconfig(policy_config, config)
-        
+        policy_config = stage2_config if (config.online or config.sample_ontest or config.loss_name=='ppo' or config.loss_name=='grpo' or config.loss_name=="remax") else stage3_config        
         #initialize policy model if needed, in PPO/DPO ... the policy model is initialized as sft model, the policy path is the path to sft model
         #In sft training, the policy_path is None
         if config.policy_path is not None:
@@ -244,15 +245,10 @@ def setup_global_config():
     config.world_size = int(os.getenv('WORLD_SIZE'))
     #warmup during 0.1 epoch at the begining
     config.warmup_steps = int(0.1*(config.num_prompts/config.global_batch_size))
+    if config.n_epochs and config.n_epochs>1:
+        config.warmup_steps = int(0.1*(config.num_prompts/(config.global_batch_size*config.n_epochs)))
     #evaluate model on test set every 1/10 epoch
     config.eval_every = int(0.1*config.num_prompts)
-    config.sample_every = 1
-    #save checkpoint every 1/10 epoch for online, every 1/5 epoch for offline, if --intermediate_checkpoints is on
-    if config.online or config.loss_name=='ppo':
-        config.save_every = int(0.1*config.num_prompts)
-    else:
-        #PPO and offline
-        config.save_every = int(0.2*config.num_prompts)
 
     #online DPO~ will have 'PromptDataLoader' as train/test DataLoader
     if config.online:
@@ -281,11 +277,13 @@ def setup_global_config():
         log_message_rank0(f'Setting eval_every to {config.eval_every - config.eval_every % config.global_batch_size}', config.log_file, config.global_rank)
         config.eval_every = config.eval_every - config.eval_every % config.global_batch_size
 
-    #Ensure that config.save_every can be divided by config.eval_every without a remainder.
-    if config.save_every % config.eval_every != 0:
-        log_message_rank0(f'Setting save_every to {config.save_every - config.save_every % config.eval_every}', config.log_file, config.global_rank)
-        config.save_every = config.save_every - config.save_every % config.eval_every
-    
+    if config.save_ckps == 'all':
+        config.save_ckps_val = [i*config.eval_every for i in range(1,11)]
+    elif config.save_ckps != "":
+        config.save_ckps_val = [int(val) for val in config.save_ckps.split('-')]
+    else:
+        config.save_ckps_val = []
+
     config_dict = vars(config)  # convert Namespace to dict
     log_message_rank0(json.dumps(config_dict, indent=4), config.log_file, config.global_rank)
     return config

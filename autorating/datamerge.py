@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import hashlib
 class DataMerge:
     """A class which can merge json files from different GPUs/Processes into a large json file
     And combine the policy-response and sft-response."""
@@ -27,7 +28,7 @@ class DataMerge:
                     # Keep only 'prompt', 'policy(_chosen)', 'proxy_reward(_chosen)' fields
                     if "sft" in dir_path:
                         filtered_data = [{'prompt': item['prompt'], 'sft-response': item['policy']} for item in data]
-                    elif "ppo" in dir_path:
+                    elif "ppo" in dir_path or "grpo" in dir_path:
                         filtered_data = [{'prompt': item['prompt'], 'policy-response': item['policy'][:item['policy'].find(self.eos_str)], 'policy-proxy_reward':item['proxy_reward_origin'], 'KL_distance':item['KL_distance']} for item in data]
                     elif "online" in dir_path:
                         #for online DPO~, we select 'policy_chosen' as 'policy-response'
@@ -51,6 +52,16 @@ class DataMerge:
         # Iterate through all sub-directories in the directory
         for sub_dir in os.listdir(dir_path):
             self.merge_jsons_for_allprocesses(os.path.join(dir_path, sub_dir))
+ 
+    def hash_string(self, input_string):
+        # 将字符串编码为UTF-8，以确保处理多语言字符
+        encoded_string = input_string.encode('utf-8')
+        
+        # 使用SHA-256算法生成哈希值
+        hash_object = hashlib.sha256(encoded_string)
+        
+        # 返回十六进制格式的哈希值
+        return hash_object.hexdigest()
 
     def combine_policy_sft(self, policy_step_path):
         policy_path = os.path.join(policy_step_path, 'merged.json')
@@ -65,12 +76,15 @@ class DataMerge:
         # Dictionary to store the sft prompt and sft response
         sft_prompt2res = {}
         for entry in sft_data:
-            sft_prompt2res[entry['prompt']] = entry['sft-response']
+            sft_prompt2res[self.hash_string(entry['prompt'])] = entry['sft-response']
         
         final_policy_data = []
         for entry in policy_data:
             if entry['policy-response']!="":
-                entry['sft-response'] = sft_prompt2res[entry['prompt']]
+                hash_value = self.hash_string(entry['prompt'])
+                if hash_value not in sft_prompt2res:
+                    continue
+                entry['sft-response'] = sft_prompt2res[hash_value]
                 final_policy_data.append(entry)
 
         # Output file for combined data

@@ -30,13 +30,13 @@ def setup_basic_argparse(parser):
     parser.add_argument('--minimum_log_interval_secs', type=float, default=10.0, help='Minimum seconds between logging events to wandb')
 
     # Intermediate checkpoints
-    parser.add_argument('--intermediate_checkpoints', action='store_true', help='Whether to save intermediate checkpoints')
+    parser.add_argument('--save_ckps', type=str, default="", help='When to save checkpoints')
+    parser.add_argument('--save_ckps_val', type=list, default=[], help='Will be set automatically')
+    parser.add_argument('--no_save_latest', action='store_true', help='Wheather to save latest checkpoint')
 
     # Training settings, all these parameters will be set automatically by code
     parser.add_argument('--warmup_steps', type=int, default=None, help='Number of linear warmup steps for the learning rate')
     parser.add_argument('--eval_every', type=int, default=None, help='Evaluate model every <eval_every> steps')
-    parser.add_argument('--sample_every', type=int, default=None, help='Sample on test set every <eval_every*sample_every> steps')
-    parser.add_argument('--save_every', type=int, default=None, help='Save model every <save_every> steps if --intermediate_checkpoints is set')
     parser.add_argument('--num_prompts', type=int, default=None, help='The number of prompts for one epoch, Should be changed according to your datasets')
 
     # Evaluation settings
@@ -67,18 +67,34 @@ def setup_basic_argparse(parser):
     parser.add_argument('--eval_only', action='store_true', help='Whether to evalute only on test set, no training')
     parser.add_argument('--sample_ontest', action='store_true', help='Whether to sample on test set when do offline training')
     parser.add_argument('--reward_statistics', action='store_true', help='Train the reward model or use already trained model to calculate reward statistics on training set')
+    
+    #KL penalty
+    parser.add_argument('--KL_coef', type=float, default=0.005, help='Coefficient on KL penalty')
+    #dpo specific settings
+    parser.add_argument('--dpo_beta', type=float, default=0.1, help='The beta for DPO training')
+    #ipo specific settings
+    parser.add_argument('--ipo_tau', type=float, default=0.1, help='The tau for IPO training')
 
     #Normalize the reward
     parser.add_argument('--reward_reg', action='store_true', help='Whether to use regularization term for reward training')
     parser.add_argument('--reward_reg_val', type=float, default=0.005, help='The degree of regularization term')
+    parser.add_argument('--reward_ceil', type=float, default=None, help='The Ceil of reward')
+
     parser.add_argument('--reward_odin', action='store_true', help='Whether to train the reward model via ODIN')
-    parser.add_argument('--reward_meanstd', action='store_true', help='Whether to normalize the reward via the running mean and std')
-    parser.add_argument('--reward_minmax', action='store_true', help='Whether to normalize the reward via the running max and min')
-    parser.add_argument('--reward_par', action='store_true', help='Whether to normalize the reward via the relative preference')
-    parser.add_argument('--reward_sigmoid', action='store_true', help='Whether to normalize the reward via sigmoid fuction')
-    parser.add_argument('--reward_discrete', action='store_true', help='Whether to normalize the reward via discrete wins')
-    parser.add_argument('--reward_discrete_maxref', type=int, default=5, help='How many reference rewards are needed to calculate the relative winrate')
-    parser.add_argument('--reward_lsc', action='store_true', help='Whether to normalize the reward via log-sigmoid centered')
+    parser.add_argument('--reward_meanstd', action='store_true', help='Whether to reshape the reward via the running mean and std')
+    parser.add_argument('--reward_minmax', action='store_true', help='Whether to reshape the reward via the running max and min')
+
+    parser.add_argument('--reward_relative', action='store_true', help='Whether to reshape the reward via the reference rewards')
+    parser.add_argument('--reward_tanh', action='store_true', help='Whether to reshape the reward via the tanh')
+    parser.add_argument('--reward_fittedpoly', action='store_true', help='Whether to reshape the reward via the fitted polynomial function')
+    parser.add_argument('--reward_maxref', type=int, default=10, help='How many reference rewards are needed to calculate the relative winrate')
+
+    parser.add_argument('--reward_sigmoid', action='store_true', help='Whether to reshape the reward via sigmoid fuction')
+    parser.add_argument('--reward_centered', action='store_true', help='Whether to reshape the reward via reference rewards(vanilla centered)')
+    parser.add_argument('--reward_sgfc', action='store_true', help='Whether to reshape the reward via slow growth then fast converge')
+
+    parser.add_argument('--sigmoid_k', type=int, default=1, help='The parameter k of sigmoid function')
+    parser.add_argument('--reward_lsc', action='store_true', help='Whether to reshape the reward via log-sigmoid centered')
     parser.add_argument('--reward_clipping', action='store_true', help='Whether to clip the reward using pre-calculated mean and std')
     return parser
 
@@ -169,12 +185,10 @@ def setup_gemma2_2b_argparse(parser):
 def setup_ppo_argparse(parser):
     # PPO specific settings
     parser.add_argument('--buffer_size', type=int, default=4, help='Number of batchs in the replay buffer')
-    parser.add_argument('--ppo_epochs', type=int, default=1, help='Number of times to iterate over the same PPO batch')
     parser.add_argument('--cliprange', type=float, default=0.2, help='Used to clip the probability ratio in range [1-cliprange, 1+cliprange]')
     parser.add_argument('--lam', type=float, default=0.95, help='Lambda for PPO')
     parser.add_argument('--gamma', type=float, default=1.0, help='Gamma for PPO')
     parser.add_argument('--critic_eps', type=float, default=0.2, help='clip range on critic loss in PPO')
-    parser.add_argument('--KL_coef', type=float, default=0.005, help='Coefficient on KL penalty')
 
     # Trainer and DataLoader settings
     parser.add_argument('--trainer', type=str, default='PPOTrainer', help='The trainer class to use')
@@ -189,9 +203,40 @@ def setup_ppo_argparse(parser):
 
     return parser
 
+def setup_grpo_argparse(parser):
+    # GRPO specific settings
+    parser.add_argument('--buffer_size', type=int, default=4, help='Number of batchs in the replay buffer')
+    parser.add_argument('--group_size', type=int, default=5, help='Number of answers in the same group(i.e. for the same question)')
+    parser.add_argument('--cliprange', type=float, default=0.2, help='Used to clip the probability ratio in range [1-cliprange, 1+cliprange]')
+
+    # Trainer and DataLoader settings
+    parser.add_argument('--trainer', type=str, default='GRPOTrainer', help='The trainer class to use')
+    parser.add_argument('--train_dataloader', type=str, default='PromptDataLoader', help='The DataLoader class to use')
+    parser.add_argument('--test_dataloader', type=str, default='PromptDataLoader', help='The DataLoader class to use')
+
+    # use models
+    parser.add_argument('--use_policy', type=bool, default=True, help='whether to use policy model')
+    parser.add_argument('--use_reference', type=bool, default=True, help='whether to use reference model')
+    parser.add_argument('--use_reward', type=bool, default=True, help='whether to use reward model')
+    parser.add_argument('--use_critic', type=bool, default=False, help='whether to use critic model')
+
+    return parser
+
+def setup_remax_argparse(parser):
+    # Trainer and DataLoader settings
+    parser.add_argument('--trainer', type=str, default='ReMaxTrainer', help='The trainer class to use')
+    parser.add_argument('--train_dataloader', type=str, default='PromptDataLoader', help='The DataLoader class to use')
+    parser.add_argument('--test_dataloader', type=str, default='PromptDataLoader', help='The DataLoader class to use')
+
+    # use models
+    parser.add_argument('--use_policy', type=bool, default=True, help='whether to use policy model')
+    parser.add_argument('--use_reference', type=bool, default=False, help='whether to use reference model')
+    parser.add_argument('--use_reward', type=bool, default=True, help='whether to use reward model')
+    parser.add_argument('--use_critic', type=bool, default=False, help='whether to use critic model')
+
+    return parser
+
 def setup_dpo_argparse(parser):
-    #dpo specific settings
-    parser.add_argument('--beta', type=float, default=0.01, help='The beta for DPO training')
     parser.add_argument('--avg_logp', type=bool, default=False, help='Whether to average logp when calculating logp on models')
 
     # Trainer and DataLoader settings
@@ -203,6 +248,22 @@ def setup_dpo_argparse(parser):
     parser.add_argument('--use_policy', type=bool, default=True, help='whether to use policy model')
     parser.add_argument('--use_reference', type=bool, default=True, help='whether to use reference model')
     parser.add_argument('--use_reward', type=bool, default=True, help='whether to use reward model, default to offline dpo')
+    parser.add_argument('--use_critic', type=bool, default=False, help='whether to use critic model')
+    return parser
+
+def setup_ipo_argparse(parser):
+    #ipo specific settings
+    parser.add_argument('--avg_logp', type=bool, default=True, help='Whether to average logp when calculating logp on models')
+
+    # Trainer and DataLoader settings
+    parser.add_argument('--trainer', type=str, default='IPOTrainer', help='The trainer class to use')
+    parser.add_argument('--train_dataloader', type=str, default='PairedPreferenceDataLoader', help='The DataLoader class to use')
+    parser.add_argument('--test_dataloader', type=str, default='PairedPreferenceDataLoader', help='The DataLoader class to use')
+    
+    # use models
+    parser.add_argument('--use_policy', type=bool, default=True, help='whether to use policy model')
+    parser.add_argument('--use_reference', type=bool, default=True, help='whether to use reference model')
+    parser.add_argument('--use_reward', type=bool, default=True, help='whether to use reward model, default to offline ipo')
     parser.add_argument('--use_critic', type=bool, default=False, help='whether to use critic model')
     return parser
 
@@ -220,23 +281,6 @@ def setup_kto_argparse(parser):
     parser.add_argument('--use_policy', type=bool, default=True, help='whether to use policy model')
     parser.add_argument('--use_reference', type=bool, default=True, help='whether to use reference model')
     parser.add_argument('--use_reward', type=bool, default=True, help='whether to use reward model, default to offline kto')
-    parser.add_argument('--use_critic', type=bool, default=False, help='whether to use critic model')
-    return parser
-
-def setup_ipo_argparse(parser):
-    #ipo specific settings
-    parser.add_argument('--tau', type=float, default=0.01, help='The tau for IPO training')
-    parser.add_argument('--avg_logp', type=bool, default=True, help='Whether to average logp when calculating logp on models')
-
-    # Trainer and DataLoader settings
-    parser.add_argument('--trainer', type=str, default='IPOTrainer', help='The trainer class to use')
-    parser.add_argument('--train_dataloader', type=str, default='PairedPreferenceDataLoader', help='The DataLoader class to use')
-    parser.add_argument('--test_dataloader', type=str, default='PairedPreferenceDataLoader', help='The DataLoader class to use')
-    
-    # use models
-    parser.add_argument('--use_policy', type=bool, default=True, help='whether to use policy model')
-    parser.add_argument('--use_reference', type=bool, default=True, help='whether to use reference model')
-    parser.add_argument('--use_reward', type=bool, default=True, help='whether to use reward model, default to offline ipo')
     parser.add_argument('--use_critic', type=bool, default=False, help='whether to use critic model')
     return parser
 
@@ -374,6 +418,10 @@ def get_args():
         parser = setup_reward_odin_argparse(parser)
     elif args.loss_name=='ppo':
         parser = setup_ppo_argparse(parser)
+    elif args.loss_name=='grpo':
+        parser = setup_grpo_argparse(parser)
+    elif args.loss_name=='remax':
+        parser = setup_remax_argparse(parser)
     elif args.loss_name=='dpo':
         parser = setup_dpo_argparse(parser)
     elif args.loss_name=='kto':

@@ -24,15 +24,13 @@ from utils.utils import (
     all_gather_if_needed,
     get_batch_logps,
     masked_mean,
-    masked_sum,
-    masked_var,
     delete_dict,
     delete_list_of_dict,
     remove_cache,
     log_message_rank0,
     custom_aligndump_fortest,
     entropy_from_logits,
-    sigmoid
+    masked_sum,
 )
 
 import wandb
@@ -62,36 +60,12 @@ class ReplayBuffer:
     def get_batch_cnt(self):
         return len(self.batchs)
         
-
-class PPOTrainer(BasicTrainer):
+class GRPOTrainer(BasicTrainer):
     def __init__(self, config, tokenizer, train_iterator, eval_iterator, policy_engine, reference_engine, reward_engine, critic_engine):
         super().__init__(config, tokenizer, train_iterator, eval_iterator, policy_engine, reference_engine, reward_engine, critic_engine)
+        self.group_size = config.group_size
         self.replay_buffer = ReplayBuffer(buffer_size=config.buffer_size)
 
-    def critic_forward(self, batch, detach: bool=False):
-        """Run the given model on the given batch of inputs.
-        Args:
-            model: model to run forward pass on
-            batch: input batch 
-            detach: wheather to detach the returned tensor
-
-        Returns: 
-            all_values: the values for each token of shape (batch_size, seq_len)
-        """
-        if self.config.reward_odin:
-            values, _ = self.critic_engine(batch['target_combined_input_ids'], attention_mask=batch['target_combined_attention_mask'])
-            values = values.contiguous()
-        else:
-            values = self.critic_engine(batch['target_combined_input_ids'], attention_mask=batch['target_combined_attention_mask']).contiguous()
-            
-        if detach:
-            values_detached = values.detach().clone()
-            del values
-            remove_cache()
-            return values_detached
-        else:
-            return values
-    
     def lm_forward(self, model, batch, detach: bool=False):
         """Run the given model on the given batch of inputs.
         Args:
@@ -118,51 +92,39 @@ class PPOTrainer(BasicTrainer):
         else:
             return all_logps, all_logits
 
-    def compute_advantages(self, values: torch.FloatTensor, rewards: torch.FloatTensor, masks: torch.FloatTensor):
+    def compute_advantages(self, rewards: torch.FloatTensor, masks: torch.FloatTensor):
         """
-        Estimate the advantages and rewards for every token taken.
+        Estimate the advantages for every token taken.
 
         Args:
-            values: the estimated values of the tokens. Should already be detached from graph.
-            rewards: signal from the reward model as to whether the generation is good or bad. It's per-token reward that subtracted by KL-penalty.
-            masks: torch tensor of shape (batch size, sequence length); 1 if token should be considered and 0 otherwise
+            rewards: torch tensor of shape (batch_size*group_size, ); signal from the reward model as to whether the generation is good or bad. 
+            masks: torch tensor of shape (batch_size*group_size, sequence_length); 1 if token should be considered and 0 otherwise
 
         Returns:
-            normalized_advantages: torch tensor of shape (batch size, sequence length)
-            returns: Also called 'rewards-to-go'.
-                Only tokens after the current token are used to calculate this: http://rail.eecs.berkeley.edu/deeprlcourse/static/slides/lec-5.pdf
-                torch tensor of shape (batch size, sequence length)
+            advantages: torch tensor of shape (batch_size*group_size, sequence_length)
         """
-        values = values * masks
-        rewards = rewards * masks
-        gae = 0 # generalized advantage estimation
-        seq_len = rewards.shape[-1]
-        advantages_reversed = []
+        batch_size_group_size = rewards.shape[0]
+        seq_len = masks.shape[-1]
+
+        # Reshape rewards to (batch_size, group_size)
+        rewards = rewards.view(-1, self.group_size)
+
+        # Compute mean and standard deviation of rewards within each group
+        mean_rewards = rewards.mean(dim=1, keepdim=True)
+        std_rewards = rewards.std(dim=1, keepdim=True)
+
+        # Normalize rewards
+        normalized_rewards = (rewards - mean_rewards) / (std_rewards + 1e-8)  # Add small epsilon to avoid division by zero
+
+        # Expand normalized_rewards to match the sequence length
+        advantages = normalized_rewards.unsqueeze(-1).expand(-1, -1, seq_len)
+
+        # Reshape advantages to (batch_size*group_size, sequence_length)
+        advantages = advantages.view(batch_size_group_size, seq_len)
         
-        returns = torch.zeros_like(rewards[:,0])
-        returns_reversed = []
-
-        for t in reversed(range(seq_len)):
-            # see https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-2-2-gae-and-ppo-loss-fe1b3c5549e8
-            delta = rewards[:, t] + self.config.gamma * (values[:, t + 1] if t < seq_len - 1 else 0.0) - values[:, t]
-            gae = delta + self.config.gamma * self.config.lam * gae
-            advantages_reversed.append(gae)
-
-            returns = rewards[:, t] + self.config.gamma * returns
-            returns_reversed.append(returns)
-            
-
-        advantages = (torch.stack(advantages_reversed[::-1]).transpose(0, 1) * masks)
-        returns = (torch.stack(returns_reversed[::-1]).transpose(0, 1) * masks).detach().clone().contiguous().to(self.local_rank)
-
-        # normalizing advantages leads to more stable learning
-        mean_adv, var_adv = masked_mean(advantages, masks), masked_var(advantages, masks)
-        normalized_advantages = (advantages - mean_adv) * torch.rsqrt(var_adv + 1e-8)
-        normalized_advantages = (normalized_advantages * masks).detach().clone().contiguous().to(self.local_rank)
-
-        return normalized_advantages, returns
+        return advantages
     
-    def policy_loss(self, batch, episode):
+    def policy_loss(self, batch, episode, split='train'):
         """
         Given the batch statistics and the current episode's logprobs, calculate the policy loss and return some loss statistics.
 
@@ -175,53 +137,32 @@ class PPOTrainer(BasicTrainer):
         """
 
         ratio = torch.exp(episode['logprobs'] - batch['logprobs'])
+        KL_penalty = torch.exp(episode['logprobs']-batch['ref_logprobs'])-(episode['logprobs']-batch['ref_logprobs'])-1
+
         policy_loss_uncliped = -batch['advantages'] * ratio
         policy_loss_clipped = -batch['advantages'] * torch.clamp(ratio, 1-self.config.cliprange, 1+self.config.cliprange)
-        policy_loss = masked_mean(torch.max(policy_loss_uncliped, policy_loss_clipped), batch['masks'])
-    
+        policy_loss = masked_mean(torch.max(policy_loss_uncliped, policy_loss_clipped)+self.config.KL_coef*KL_penalty, batch['masks'])
+     
         loss_stats = {
             'loss/policy' : policy_loss.detach().clone(),
         }
         return policy_loss, loss_stats
 
-    def critic_loss(self, batch, episode) -> Tuple:
-        """
-        Given the batch statistics and the current episode's values, calculate the critic oss and return some loss statistics.
+    def get_batch_policy_metrics(self, grpo_batch):
+        """Given a batch that has been processed in the outer loop of GRPO, return the batch statistics and the policy loss.
         Args:
-            batch: dictionary containing the batch data off the computation graph, namely v_\phi_n
-            episode: dictionary containing the episode data on the computation graph, namely v_\phi
-        Returns:
-            loss: critic loss
-            loss_stats: dictionary of episode/batch statistics
-        """
-            
-        values_clipped = batch['values'] + (episode['values'] - batch['values']).clamp(-self.config.critic_eps, self.config.critic_eps)
-        surr1 = (values_clipped - batch['returns']) ** 2
-        surr2 = (episode['values'] - batch['returns']) ** 2
-        critic_loss = torch.max(surr1, surr2)
-        critic_loss = masked_mean(critic_loss, batch['masks'])
-
-        loss_stats = {
-            'loss/critic' : critic_loss.detach().clone(),
-        }
-
-        return critic_loss, loss_stats
-    
-    def get_batch_policy_metrics(self, ppo_batch):
-        """Given a batch that has been processed in the outer loop of PPO, return the batch statistics and the policy loss.
-        Args:
-            ppo_batch: A dict contains advantages, returns, \pi_\theta_n(y|x)
+            grpo_batch: A dict contains advantages, returns, \pi_\theta_n(y|x)
         Returns:
             policy_loss: A tensor, ppo-clip loss
             batch_metrics: A dict, policy loss metrics
         """
         #\pi_\theta
-        episode_logprobs, _ = self.lm_forward(self.policy_engine, ppo_batch, detach=False)
+        episode_logprobs, _ = self.lm_forward(self.policy_engine, grpo_batch, detach=False)
         #episode is on policy device with computation graph
         episode =  {
             'logprobs' : episode_logprobs,
         }
-        policy_loss, metrics = self.policy_loss(ppo_batch, episode)
+        policy_loss, metrics = self.policy_loss(grpo_batch, episode)
         batch_metrics = defaultdict(list)
         for k, v in metrics.items():
             v = all_gather_if_needed(v, self.local_rank, self.world_size).flatten()
@@ -231,45 +172,20 @@ class PPOTrainer(BasicTrainer):
         delete_dict(episode)
 
         return policy_loss, batch_metrics
-    
-    def get_batch_critic_metrics(self, ppo_batch):
-        """Given a batch that has been processed in the outer loop of PPO, return the batch statistics and the critic loss.
-        Args:
-            ppo_batch: A dict contains advantages, returns, \pi_\theta_n(y|x)
-        Returns:
-            critic_loss: A tensor, MOE loss
-            batch_metrics: A dict, critic loss metrics
-        """
-        #V_\phi
-        episode_values = self.critic_forward(ppo_batch, detach=False)
-        #episode is on policy device with computation graph
-        episode =  {
-            'values' : episode_values,
-        }
-        critic_loss, metrics = self.critic_loss(ppo_batch, episode)
-        batch_metrics = defaultdict(list)
-        for k, v in metrics.items():
-            v = all_gather_if_needed(v, self.local_rank, self.world_size).flatten()
-            batch_metrics[k].extend(v.float().cpu().numpy().tolist())
 
-        delete_dict(metrics)
-        delete_dict(episode)
-
-        return critic_loss, batch_metrics
-    
-    def build_ppo_batch(self, raw_batch):
+    def build_grpo_batch(self, raw_batch):
         """
-        Given a raw_batch which only contains 'prompt_text', trun it into a ppo_batch which can be used for policy and critic model training.
+        Given a raw_batch which only contains 'prompt_text', trun it into a grpo_batch which can be used for policy model training.
         Args:
             raw_batch: A batch from PromptDataLoader, which only contains 'prompt_text'
         Returns:
-            ppo_batch: A dict contains advantages, returns, \pi_\theta_n(y|x), which can be used for ppo training
+            grpo_batch: A dict contains advantages, \pi_\theta_n(y|x), which can be used for grpo training
             
         """
         batch_size = len(raw_batch['prompt_text'])
         raw_batch = move_batch_on_device(raw_batch, self.local_rank)
         #sample responses from \pi_\theta_n
-        raw_batch['target_text'] = self.sample_from_policy(raw_batch, 1)
+        raw_batch['target_text'] = self.sample_from_policy(raw_batch, self.group_size)
 
         #log sampled responses
         self.log_message_rank0(f"{len(raw_batch['target_text'])} responses have been sampled")
@@ -277,16 +193,18 @@ class PPOTrainer(BasicTrainer):
         self.log_message_rank0(f"Policy model response is:\n{raw_batch['target_text'][-1]}")
 
         sampled_batch = []
+        #Generate multiple answers for a single question and calculate advantages via Group Relative Rewards.
         for i in range(batch_size):
-            batch_element = self.train_iterator.tokenize_batch_element_prompt_generation(raw_batch['prompt_text'][i], raw_batch['target_text'][i], raw_batch['truncation_mode'][i], prefix='target')
-            sampled_batch.append(batch_element)
-
+            for j in range(self.group_size):
+                idx = i*self.group_size + j
+                batch_element = self.train_iterator.tokenize_batch_element_prompt_generation(raw_batch['prompt_text'][i], raw_batch['target_text'][idx], raw_batch['truncation_mode'][i], prefix='target')
+                batch_element['sftref_rewards'] = raw_batch['sftref_rewards'][i]
+                sampled_batch.append(batch_element)
         batch = self.train_iterator.collate(sampled_batch)
-        batch['sftref_rewards'] = raw_batch['sftref_rewards']
         batch = move_batch_on_device(batch, self.local_rank)
         #query reward model to get the sequence reward
         batch['rewards'], batch['rewards_origin'] = self.reward_forward(batch, prefix='target', detach=True)
-
+    
         delete_dict(raw_batch)
         delete_list_of_dict(sampled_batch)
 
@@ -295,65 +213,52 @@ class PPOTrainer(BasicTrainer):
             masks = (batch['target_labels'] != -100).detach().clone().contiguous().to(self.policy_dtype)
             # \pi_\theta_n, we detach it from computation graph since it should be a constant
             logprobs, logits = self.lm_forward(self.policy_engine, batch, detach=True)
-            # V_\phi_n, we detach it from computation graph since it should be a constant
-            values = self.critic_forward(batch, detach=True)
             # \pi_ref, we detach it from computation graph since it should be a constant
             ref_logprobs, _ = self.lm_forward(self.reference_engine, batch, detach=True)
+                   
+            advantages = self.compute_advantages(batch['rewards'], masks) 
 
-            rewards = torch.zeros_like(masks).to(self.local_rank)
-            for row in range(rewards.shape[0]):
-                #only set the reward for last token, others are all zero
-                rewards[row, masks[row].nonzero()[-1]] = batch['rewards'][row]
-            
-            KL_penalty = logprobs-ref_logprobs          
-            rewards = rewards - self.config.KL_coef * KL_penalty
-            rewards = rewards.contiguous() * masks
-
-            advantages, returns = self.compute_advantages(values, rewards, masks) 
+        KL_penalty = torch.exp(logprobs-ref_logprobs)-(logprobs-ref_logprobs)-1
 
         #This is a dict of constants off the computation graph, i.e. stop gradient
-        ppo_batch = {
+        grpo_batch = {
             "target_combined_input_ids" : batch['target_combined_input_ids'],
             "target_labels" : batch['target_labels'],
             "target_combined_attention_mask" : batch['target_combined_attention_mask'],
             "rewards": batch['rewards'], 
             #we also display the reward not penalized by response length
             "rewards_origin": batch['rewards_origin'],
-            "KL_penalty": KL_penalty,
             "logprobs": logprobs, #
             "ref_logprobs": ref_logprobs,
             "masks": masks,
             "advantages": advantages, #
-            "returns": returns, #
-            'values': values, #
             'entropy': entropy_from_logits(logits, masks),
+            "KL_penalty": KL_penalty,
             #We also reserve prompt/target texts
             "prompt_text": batch['prompt_text'],
             "target_text": batch['target_text'],
             'target_input_ids': batch['target_input_ids']
         }
 
-        return ppo_batch
+        return grpo_batch
 
-    def build_ppo_batch_metrics(self, ppo_batch, split='train'):
-        ppo_batch_metrics = {}
-        ppo_batch_metrics[f'{split}/advantages'] = masked_mean(ppo_batch['advantages'], ppo_batch['masks'])            
-        ppo_batch_metrics[f'{split}/KL_penalty']  = masked_sum(ppo_batch['KL_penalty'], ppo_batch['masks'], axis=-1) 
-        ppo_batch_metrics[f'{split}/returns']  = masked_mean(ppo_batch['returns'], ppo_batch['masks']) 
-        ppo_batch_metrics[f'{split}/entropy'] = ppo_batch['entropy']
-        ppo_batch_metrics[f'{split}/proxy_rewards'] = ppo_batch['rewards']
-        ppo_batch_metrics[f'{split}/proxy_rewards_origin'] = ppo_batch['rewards_origin']
-        ppo_batch_metrics[f'{split}/response_len'] = torch.tensor(ppo_batch['target_input_ids'].shape[1], dtype=torch.float32).to(self.local_rank)
-        ppo_batch_metrics[f'{split}/ppl'] = (-masked_mean(ppo_batch['logprobs'], ppo_batch['masks'])).exp()
-        
-        return ppo_batch_metrics
+    def build_grpo_batch_metrics(self, grpo_batch, split='train'):
+        grpo_batch_metrics = {}
+        grpo_batch_metrics[f'{split}/advantages'] = masked_mean(grpo_batch['advantages'], grpo_batch['masks'])            
+        grpo_batch_metrics[f'{split}/KL_penalty']  = masked_sum(grpo_batch['KL_penalty'], grpo_batch['masks'], axis=-1) 
+        grpo_batch_metrics[f'{split}/entropy'] = grpo_batch['entropy']
+        grpo_batch_metrics[f'{split}/proxy_rewards'] = grpo_batch['rewards']
+        grpo_batch_metrics[f'{split}/proxy_rewards_origin'] = grpo_batch['rewards_origin']
+        grpo_batch_metrics[f'{split}/response_len'] = torch.tensor(grpo_batch['target_input_ids'].shape[1], dtype=torch.float32).to(self.local_rank)
+        grpo_batch_metrics[f'{split}/ppl'] = (-masked_mean(grpo_batch['logprobs'], grpo_batch['masks'])).exp()
+        return grpo_batch_metrics
 
     def eval_ontest(self):
         """
         Run evaluation on all the examples in the test data and wandb_log the metrics from get_batch_metrics.
         """
         self.log_message_rank0('#'*30+'Running evaluation and sampling...'+'#'*30)
-        all_policy_samples, all_prompts, all_rewards, all_rewards_origin, all_advantages, all_tokens, all_kl_distances= [], [], [], [], [], [], []
+        all_policy_samples, all_prompts, all_rewards, all_rewards_origin, all_kl_distances= [], [], [], [], []
         samples = []
 
         self.set_eval_mode()
@@ -361,27 +266,22 @@ class PPOTrainer(BasicTrainer):
 
         for raw_batch in (tqdm.tqdm(self.eval_iterator, desc='Computing eval metrics') if self.global_rank==0 else self.eval_iterator):
             #calculate some constants: \pi_nlogp ,ref_logp, return, Vn_value, advantage
-            ppo_batch = self.build_ppo_batch(raw_batch)
-
-            all_prompts.extend(ppo_batch['prompt_text'])
-            all_policy_samples.extend(ppo_batch['target_text'])
-            all_rewards.extend(ppo_batch['rewards'].float().cpu().numpy().tolist())
-            all_rewards_origin.extend(ppo_batch['rewards_origin'].float().cpu().numpy().tolist())
+            grpo_batch = self.build_grpo_batch(raw_batch)
+            all_prompts.extend(grpo_batch['prompt_text'])
+            all_policy_samples.extend(grpo_batch['target_text'])
+            all_rewards.extend(grpo_batch['rewards'].float().cpu().numpy().tolist())
+            all_rewards_origin.extend(grpo_batch['rewards_origin'].float().cpu().numpy().tolist())
 
             #record metrics
-            ppo_batch_metrics = self.build_ppo_batch_metrics(ppo_batch, 'test')
-
+            grpo_batch_metrics = self.build_grpo_batch_metrics(grpo_batch, 'test')
+ 
             #recored token-level advantage 
-            all_advantages.extend((ppo_batch['advantages']*ppo_batch['masks']).float().cpu().numpy().tolist())
-            decoded_tokens = [[self.tokenizer.decode([token], skip_special_tokens=True) for token in sentence] for sentence in ppo_batch['target_combined_input_ids'].cpu().numpy().tolist()]
-            all_tokens.extend(decoded_tokens)
-
-            all_kl_distances.extend(ppo_batch_metrics['test/KL_penalty'].float().cpu().numpy().tolist())
-
-            for k, v in ppo_batch_metrics.items():
+            all_kl_distances.extend(grpo_batch_metrics['test/KL_penalty'].float().cpu().numpy().tolist())
+            for k, v in grpo_batch_metrics.items():
                 #gather data from other GPUs
                 v = all_gather_if_needed(v, self.local_rank, self.world_size).flatten()
                 batch_metrics[k].extend(v.float().cpu().numpy().tolist())
+            
 
         #log mean_test_metrics
         mean_test_metrics = {}
@@ -394,16 +294,14 @@ class PPOTrainer(BasicTrainer):
         if self.config.wandb_enabled and self.global_rank==0:
             wandb.log(mean_test_metrics, step=self.batch_counter)  
 
-        if self.example_counter % self.config.eval_every  == 0:
+        if self.example_counter % self.config.eval_every == 0:
             #save policy generations on test set
-            for i in range(len(all_prompts)):
+            for i in range(0, len(all_prompts), self.group_size):
                 samples.append({
                     'prompt' : all_prompts[i],
                     'policy' : all_policy_samples[i],
                     'proxy_reward' : all_rewards[i],
                     'proxy_reward_origin': all_rewards_origin[i],
-                    'tokens' : all_tokens[i],
-                    'advantages': all_advantages[i],
                     'KL_distance': all_kl_distances[i],
                 })
 
@@ -413,13 +311,12 @@ class PPOTrainer(BasicTrainer):
             file_path = os.path.join(sample_dir, f"{self.global_rank}.json")
             #align advantages and tokens for clear illustration
             custom_aligndump_fortest(samples, file_path)
-        
         # Release memory                                                                                                                                                                                                                                                                                                              
         delete_dict(batch_metrics)
         delete_dict(mean_test_metrics)
-        delete_dict(ppo_batch)
-        delete_dict(ppo_batch_metrics)
-        del all_policy_samples, all_prompts, all_rewards, all_advantages, all_tokens
+        delete_dict(grpo_batch)
+        delete_dict(grpo_batch_metrics)
+        del all_policy_samples, all_prompts, all_rewards
         remove_cache()
 
     def train(self):
@@ -428,9 +325,8 @@ class PPOTrainer(BasicTrainer):
             with open(os.path.join(self.remote_run_dir, 'train_config.json'), 'w') as f:
                 json.dump(vars(self.config), f, indent=4)
 
-        self.log_message_rank0(f"epoch:{self.config.n_epochs}, policy_lr:{self.config.learning_rate}, critic_lr:{self.config.critic_lr}")
+        self.log_message_rank0(f"epoch:{self.config.n_epochs}, policy_lr:{self.config.learning_rate}")
         self.policy_engine.train()
-        self.critic_engine.train()
         self.reference_engine.eval()
         self.reward_engine.eval()
 
@@ -449,39 +345,31 @@ class PPOTrainer(BasicTrainer):
             ###################training part#############
             dist.barrier()
             start_time = time.time()
-            ppo_batch = self.build_ppo_batch(raw_batch)
-            ppo_batch = self.replay_buffer.substitute(ppo_batch)
-            if ppo_batch==None:
-                continue
-            
+            grpo_batch = self.build_grpo_batch(raw_batch)  
+            grpo_batch = self.replay_buffer.substitute(grpo_batch)
+            if grpo_batch==None:
+                continue          
+
             remove_cache()
             #record metrics
-            ppo_batch_metrics = self.build_ppo_batch_metrics(ppo_batch, 'train')
+            grpo_batch_metrics = self.build_grpo_batch_metrics(grpo_batch, 'train')
 
-            for k, v in ppo_batch_metrics.items():
+            for k, v in grpo_batch_metrics.items():
                 #gather data from other GPUs
                 v = all_gather_if_needed(v, self.local_rank, self.world_size).flatten()
                 batch_metrics[k].extend(v.float().cpu().numpy().tolist())
-
+ 
             self.set_train_mode()
 
             #update the policy and critic model using online data
             #Note that we update policy and critic seperately to save memory
-            policy_loss, batch_policy_metrics = self.get_batch_policy_metrics(ppo_batch) 
+            policy_loss, batch_policy_metrics = self.get_batch_policy_metrics(grpo_batch) 
             self.policy_engine.backward(policy_loss) 
             self.policy_engine.step()
             del policy_loss
-            critic_loss, batch_critic_metrics = self.get_batch_critic_metrics(ppo_batch)
-            self.critic_engine.backward(critic_loss)
-            self.critic_engine.step()
-            del critic_loss
             #batch_metrics has two dimentions. 1.from different ppo_epoch 2.from different GPUs
             for k,v in batch_policy_metrics.items():
                 batch_metrics[k].extend(v)
-            for k,v in batch_critic_metrics.items():
-                batch_metrics[k].extend(v)
-                
-                
                 
             self.batch_counter += 1
             self.example_counter += self.config.global_batch_size
@@ -504,10 +392,9 @@ class PPOTrainer(BasicTrainer):
             # Release memory                                                                                                                                                                                                                                                                                                                              
             delete_dict(batch_metrics)
             delete_dict(mean_train_metrics)
-            delete_dict(ppo_batch)
-            delete_dict(ppo_batch_metrics)
+            delete_dict(grpo_batch)
+            delete_dict(grpo_batch_metrics)
             delete_dict(batch_policy_metrics)
-            delete_dict(batch_critic_metrics)
             remove_cache()
             batch_metrics = defaultdict(list) 
             

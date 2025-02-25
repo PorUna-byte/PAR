@@ -167,34 +167,51 @@ def remove_cache():
     gc.collect()
     torch.cuda.empty_cache()
 
+# def custom_aligndump_fortest(data_list, file_path):
+#     """log tokens and advantages in a neat way"""
+#     with open(file_path, "w") as f:
+#         all_entries = []
+#         for data in data_list:
+#             # 确保 tokens 和 advantages 有相同长度
+#             tokens = data.get("tokens", [])
+#             advantages = data.get("advantages", [])
+#             if len(tokens) != len(advantages):
+#                 raise ValueError("tokens 和 advantages 的元素数量不一致")
+
+#             # 计算最长的 token 长度，不包括逗号，确保对齐
+#             max_token_length = max(len(json.dumps(t)) for t in tokens)
+            
+#             # 对齐显示的 tokens 和 advantages 列表，通过空格确保完全左对齐
+#             tokens_str = '    [ ' + ', '.join(json.dumps(t).ljust(max_token_length + 1) for t in tokens) + ' ]'
+#             advantages_str = '[ ' + ', '.join(f'{adv:.3f}'.ljust(max_token_length + 1) for adv in advantages) + ' ]'
+
+#             # 构造其他内容
+#             other_content = {
+#                 key: value for key, value in data.items() if key != "tokens" and key != "advantages"
+#             }
+#             json_str = json.dumps(other_content, indent=2)
+#             json_str = json_str[:-2] + f',\n  "tokens": {tokens_str},\n  "advantages": {advantages_str}\n}}'
+#             all_entries.append(json_str)
+        
+#         # 合并多个字典并写入文件
+#         f.write('[\n' + ',\n'.join(all_entries) + '\n]')
+
+
 def custom_aligndump_fortest(data_list, file_path):
     """log tokens and advantages in a neat way"""
     with open(file_path, "w") as f:
         all_entries = []
         for data in data_list:
-            # 确保 tokens 和 advantages 有相同长度
-            tokens = data.get("tokens", [])
-            advantages = data.get("advantages", [])
-            if len(tokens) != len(advantages):
-                raise ValueError("tokens 和 advantages 的元素数量不一致")
-
-            # 计算最长的 token 长度，不包括逗号，确保对齐
-            max_token_length = max(len(json.dumps(t)) for t in tokens)
-            
-            # 对齐显示的 tokens 和 advantages 列表，通过空格确保完全左对齐
-            tokens_str = '    [ ' + ', '.join(json.dumps(t).ljust(max_token_length + 1) for t in tokens) + ' ]'
-            advantages_str = '[ ' + ', '.join(f'{adv:.3f}'.ljust(max_token_length + 1) for adv in advantages) + ' ]'
-
             # 构造其他内容
             other_content = {
                 key: value for key, value in data.items() if key != "tokens" and key != "advantages"
             }
             json_str = json.dumps(other_content, indent=2)
-            json_str = json_str[:-2] + f',\n  "tokens": {tokens_str},\n  "advantages": {advantages_str}\n}}'
             all_entries.append(json_str)
         
         # 合并多个字典并写入文件
         f.write('[\n' + ',\n'.join(all_entries) + '\n]')
+
 
 def get_padding_value(k, pad_token_id):
     """Get padding value for input_id, labels, attention_mask"""
@@ -382,5 +399,11 @@ if __name__=='__main__':
     # merge_jsonl_to_json('/data/models/gen_refs_gemma2-2b_ultrafb_bin/train', '/data/data/ultrafb_bin/gemma2-2b_train_prefs_plus.json')
     # merge_jsonl_to_json('/data/models/gen_refs_gemma2-2b_hh_rlhf/test', '/data/data/hh-rlhf-helpful/gemma2-2b_test_prefs_plus.json')
     # merge_jsonl_to_json('/data/models/gen_refs_gemma2-2b_hh_rlhf/train', '/data/data/hh-rlhf-helpful/gemma2-2b_train_prefs_plus.json')
+
+    # merge_jsonl_to_json('/data/models/gen_refs_llama3-8b_ultrafb_bin/test', '/data/data/ultrafb_bin/llama3-8b_test_prefs_plus.json')
+    # merge_jsonl_to_json('/data/models/gen_refs_llama3-8b_ultrafb_bin/train', '/data/data/ultrafb_bin/llama3-8b_train_prefs_plus.json')
+
+    merge_jsonl_to_json('/data/models/gen_refs_llama3-8b_hh_rlhf/test', '/data/data/hh-rlhf-helpful/llama3-8b_test_prefs_plus.json')
+    merge_jsonl_to_json('/data/models/gen_refs_llama3-8b_hh_rlhf/train', '/data/data/hh-rlhf-helpful/llama3-8b_train_prefs_plus.json')
     pass
 

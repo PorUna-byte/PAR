@@ -2,11 +2,11 @@ import json
 import os, sys
 # Add the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.secret import step_apikey, step_apibase, kwapikey, deepseek_key
+from utils.secret import  deepseek_key, deepseek_base, deepseek_model, kimi_model, kimi_base, kimi_key
 from openai import OpenAI
 import time
 import random
-from utils.prompt import compare_prompt_for_chat, compare_prompt_for_summary
+from utils.prompt import compare_prompt_for_chat
 from utils.utils import count_valid_json_lines, append_to_jsonl, convert_jsonl_to_json
 import re
 import httpx
@@ -14,14 +14,11 @@ from scorer import BasicScorer
 
 class LLMScorer(BasicScorer):
     """A class which call LLM api (i.e. gpt4o) to compare the responses given by policy model and sft model"""
-    def __init__(self, config):
-        super().__init__(config)
-        self.client = OpenAI(api_key=deepseek_key, base_url="https://api.deepseek.com", http_client=httpx.Client(
-        proxies="http://proxy.i.basemind.com:3128", 
-        transport=httpx.HTTPTransport(local_address="0.0.0.0")))
+    def __init__(self, config, policy_exp_name):
+        super().__init__(config, policy_exp_name)
+        self.client = OpenAI(base_url=deepseek_base, api_key=deepseek_key)
         self.temperature = config.temperature
         self.generation_times = config.generation_times
-
         self.compare_prompt = compare_prompt_for_chat
         self.request_string = '<question>:'
         self.Assistant_A = '<Assistant-A response>:'
@@ -36,7 +33,7 @@ class LLMScorer(BasicScorer):
         """
         results = []
         completion = self.client.chat.completions.create(
-            model=self.llm_model_name,
+            model=deepseek_model,
             messages=msg,
             temperature=self.temperature,
             n=self.generation_times,
@@ -62,6 +59,8 @@ class LLMScorer(BasicScorer):
             except Exception as e:
                 # if there is a network error, we increment error_times and wait for a while
                 print(f'Exception when call API: {e}')
+                if "Error code: 400" in str(e):
+                    return True, ["Risks Exist, Evaluation Abort. Better: N"]
                 error_times += 1 
                 time.sleep(random.random() * 2 * error_times)
                 if error_times >= 10: 
@@ -80,10 +79,9 @@ class LLMScorer(BasicScorer):
         
         for datum in data:
             # First input: policy-response as Assistant-A, sft-response as Assistant-B
-            input_1 =  '\n' + self.request_string + '\n'+ datum['prompt']+ '\n' + self.Assistant_A + '\n' + datum[f'{key1}-response'] + '\n' + self.Assistant_B + '\n' + datum[f'{key2}-response'] + '\n'
+            input_1 =  f"""\n{self.request_string}\n{datum['prompt']}\n{self.Assistant_A}\n{datum[f'{key1}-response']}\n{self.Assistant_B}\n{datum[f'{key2}-response']}\n"""
             # Second input: sft-response as Assistant-A, policy-response as Assistant-B
-            input_2 =  '\n' + self.request_string + '\n'+ datum['prompt'] + '\n' + self.Assistant_A + '\n' + datum[f'{key2}-response'] + '\n' + self.Assistant_B + '\n' + datum[f'{key1}-response'] + '\n'
-
+            input_2 =  f"""\n{self.request_string}\n{datum['prompt']}\n{self.Assistant_A}\n{datum[f'{key2}-response']}\n{self.Assistant_B}\n{datum[f'{key1}-response']}\n"""
             inputs.append((input_1, input_2))
         
         return inputs
@@ -165,7 +163,11 @@ class LLMScorer(BasicScorer):
     def process_policy_sft_score(self, rank, sub_dir):
         step_path = os.path.join(self.policy_sample_dir, sub_dir, 'merged.json')
         step_path_temp = os.path.join(self.policy_sample_dir, sub_dir, 'merged.jsonl')
-        data = json.load(open(step_path, 'r'))
+        try:
+            data = json.load(open(step_path, 'r'))
+        except Exception as e:
+            print(e)
+
         
         # Skip already scored json files
         if f'policy-{self.llm_model_name}_score' in data[0]:

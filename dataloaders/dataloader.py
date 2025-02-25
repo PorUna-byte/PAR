@@ -278,13 +278,6 @@ class PromptDataLoader(DataLoader):
                         done = True
                         break
 
-            # # Handle any remaining data that does not fill up a full batch
-            # if len(batch) >= self.world_size:
-            #     example_idx += len(batch)
-            #     # Split the final smaller batch across GPUs
-            #     batch_for_gpu = self.split_batch_for_gpus(batch)
-            #     yield self.collate(batch_for_gpu)
-
             # Stop after the specified number of epochs
             epoch_idx += 1
             if self.n_epochs is not None and epoch_idx >= self.n_epochs:
@@ -308,6 +301,7 @@ class SFTDataLoader(DataLoader):
                     example.truncation_mode
                 )
                 batch_element['truncation_mode'] = example.truncation_mode
+                batch_element['sftref_rewards'] = example.sftref_rewards
                 batch.append(batch_element)
 
                 if len(batch) == self.batch_size:
@@ -353,8 +347,7 @@ class PairedPreferenceDataLoader(DataLoader):
                 batch_element.update(self.tokenize_batch_element_prompt_generation(example.prompt, example.generations[i], example.truncation_mode, prefix='chosen'))
                 batch_element.update(self.tokenize_batch_element_prompt_generation(example.prompt, example.generations[j], example.truncation_mode, prefix='rejected'))
                 batch_element['truncation_mode'] = example.truncation_mode
-                batch_element['sftref_rewards'] = example.sftref_rewards
-
+                batch_element['sftref_rewards'] = example.sftref_rewards        
                 batch.append(batch_element)
 
                 if len(batch) == self.batch_size:

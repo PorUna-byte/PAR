@@ -83,7 +83,7 @@ class BasicTrainer(object):
         #we may need to evaluate model on test set for multiple times, so iterate over test set beforehand and collect test data in a list.
         self.eval_iterator = list(eval_iterator) if eval_iterator!=None else None
 
-    def sample_from_policy(self, batch, generations_per_prompt=1):
+    def sample_from_policy(self, batch, generations_per_prompt=1, do_sample=True):
         """Generate samples from the policy model.
         Args:
             batch: A dict contains prompts
@@ -97,13 +97,14 @@ class BasicTrainer(object):
                 batch['prompt_input_ids'],
                 attention_mask=batch['prompt_attention_mask'],
                 max_new_tokens=self.config.max_new_tokens,
-                do_sample=True,
+                do_sample=do_sample,
                 pad_token_id=self.tokenizer.pad_token_id,
                 top_p=self.config.top_p,
                 top_k=self.config.top_k,
                 temperature=self.config.temperature,
                 length_penalty=self.config.length_penalty,
                 num_return_sequences=generations_per_prompt, 
+                
             ).detach().clone()
             # eliminate prompts from the output
             pure_policy_output = torch.fill(torch.zeros(policy_output.shape).to(self.local_rank).to(torch.int64), self.tokenizer.pad_token_id)
@@ -228,7 +229,7 @@ class BasicTrainer(object):
         if self.config.wandb_enabled and self.global_rank==0:
             wandb.log(mean_eval_metrics, step=self.batch_counter)
         
-        if self.config.online and (self.example_counter % (self.config.eval_every * self.config.sample_every) == 0):
+        if self.config.online and (self.example_counter % self.config.eval_every == 0):
             samples = []
             assert len(all_prompts) == len(all_chosen_policy_samples) and len(all_prompts) == len(all_rejected_policy_samples) and len(all_prompts) == len(all_chosen_rewards) and len(all_prompts) == len(all_rejected_rewards) 
 
@@ -268,6 +269,8 @@ class BasicTrainer(object):
         batch_size = len(raw_batch['prompt_text'])
         for i in range(batch_size):
             batch_element = self.train_iterator.tokenize_batch_element_prompt_generation(raw_batch['prompt_text'][i], raw_batch['sample_text'][i], raw_batch['truncation_mode'][i], prefix='sample')
+            batch_element['sftref_rewards'] = raw_batch['sftref_rewards'][i]
+            batch_element['truncation_mode'] = raw_batch['truncation_mode'][i]
             sampled_batch.append(batch_element)
 
         batch = self.train_iterator.collate(sampled_batch)
@@ -386,6 +389,7 @@ class BasicTrainer(object):
             rewards, _ = self.reward_engine(batch[f'{prefix}_combined_input_ids'], attention_mask=batch[f'{prefix}_combined_attention_mask'])
         else:
             rewards = self.reward_engine(batch[f'{prefix}_combined_input_ids'], attention_mask=batch[f'{prefix}_combined_attention_mask'])
+        
         # we only use reward model to get rewards, No training for reward model, so detach it
         rewards = rewards.detach().clone()
         masks = (batch[f'{prefix}_labels'] != -100).detach().clone().to(self.reward_dtype).contiguous().to(self.local_rank)
@@ -404,7 +408,6 @@ class BasicTrainer(object):
         
         #shaping the reward using different strategies
         last_token_reward = self.reward_shaper.shaped_reward(last_token_reward, masks, batch['sftref_rewards'])
-        
         if detach:
             return last_token_reward.detach().clone(), last_token_reward_origin.detach().clone()
         
@@ -561,11 +564,11 @@ class BasicTrainer(object):
                 #save the samples on directory named after training steps
                 self.eval_ontest(tag=tag)
 
-                if self.config.sample_ontest and not self.config.online and (self.example_counter % (self.config.eval_every * self.config.sample_every) == 0):
+                if self.config.sample_ontest and not self.config.online and (self.example_counter % self.config.eval_every == 0):
                     self.sample_ontest(tag=tag)
                 
-                #save models if --intermediate_checkpoints is set
-                if self.example_counter > 0 and self.config.intermediate_checkpoints and self.example_counter % self.config.save_every == 0:
+                #save models if self.example_counter is in save_ckps
+                if self.example_counter > 0 and self.example_counter in self.config.save_ckps_val:
                     self.log_message_rank0(f'creating checkpoint to write to {self.remote_run_dir} with tag {tag}...')
                     self.save_checkpoint(tag=tag)
              
@@ -627,7 +630,8 @@ class BasicTrainer(object):
             del loss
             remove_cache()
         
-        self.save_checkpoint()
+        if not self.config.no_save_latest:
+            self.save_checkpoint()
 
     def save_checkpoint(self, checkpoint_dir=None, tag=None):
         """

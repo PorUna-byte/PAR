@@ -147,8 +147,8 @@ class AutoModelForCausalLMWithScalarHead(PreTrainedModelWrapper):
         )
 
         last_hidden_state = base_model_output.hidden_states[-1]
-        scalar_value = self.scalar_head(last_hidden_state).squeeze(-1)
 
+        scalar_value = self.scalar_head(last_hidden_state).squeeze(-1)
         return scalar_value
     
 class AutoModelForCausalLMWithScalarHeadODIN(PreTrainedModelWrapper):
