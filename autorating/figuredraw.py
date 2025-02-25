@@ -9,14 +9,7 @@ import json
 
 # Interpolate missing values for proxy rewards and winrates
 from scipy.interpolate import interp1d
-import difflib
 from utils.utils import sigmoid
-
-def fuzzy_match(str1, str2, threshold=0.8):
-    # 计算相似度
-    similarity = difflib.SequenceMatcher(None, str1, str2).ratio()
-    # 判断是否达到阈值
-    return similarity >= threshold
 
 class FigureDraw:
     """Draw figures for proxy/gold reward on different training steps
