@@ -2,7 +2,7 @@
 Welcome to the PAR open-source project! This project aims to provide a collection of advanced reinforcement learning algorithm implementations, including SFT, Reward Modeling, PPO, DPO, IPO, KTO, SLIC, ReMax, and GRPO. Our goal is to help researchers and developers easily apply and extend these algorithms.
 
 We also explore some methods to mitigate reward hacking problem, such as WARM, ODIN, Reg, Meanstd, Clip, Minmax, LSC, PAR.
-For more details, see this paper: 
+For more details, see this paper: <https://arxiv.org/abs/2502.18770>
 
 
 ## Directory Structure
