@@ -143,7 +143,7 @@ class FigureDraw:
         ax2 = ax1.twinx()
 
         # Define color map for different loss functions
-        color_map = plt.cm.get_cmap('tab20')  # Use a more visually appealing colormap
+        color_map = plt.cm.get_cmap('tab10')  # Use a more visually appealing colormap
         loss_names = list(self.step_to_policy_winrate.keys())
         num_losses = len(loss_names)
 

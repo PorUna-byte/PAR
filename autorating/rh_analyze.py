@@ -44,8 +44,8 @@ def gemma_ultra_lab1():
     args.dataset_name = 'ultrafb_bin'
     args.loss_name = 'ppo'
     args.lab_name = 'lab1'
-    policy_exp_names = ['vanilla', 'WARM', 'ODIN', 'reg','meanstd', 'clip', 'minmax', 'lsc', 'PAR','vanilla_centered', 'sgfc']
-    args.display_name = str(['Vanilla', 'WARM', 'ODIN', 'Reg','Meanstd', 'Clip', 'Minmax', 'LSC', 'PAR','Vanilla_Centered', 'SgFc'])
+    policy_exp_names = ['vanilla', 'WARM', 'ODIN', 'reg','meanstd', 'clip', 'minmax', 'lsc', 'PAR', 'sgfc']
+    args.display_name = str(['Vanilla', 'WARM', 'ODIN', 'Reg','Meanstd', 'Clip', 'Minmax', 'LSC', 'PAR', 'SgFc'])
 
     policy_exp_names_full = []
     #Merge
@@ -281,8 +281,8 @@ def llama_hhrlhf_lab1():
     drawer.draw_rh_bystep()
 
 if __name__ == '__main__':
-    gemma_ultra_lab1()
-    # gemma_ultra_lab1_grpo()
+    # gemma_ultra_lab1()
+    gemma_ultra_lab1_grpo()
     # gemma_ultra_lab2()
     # gemma_ultra_lab34()
     # gemma_ultra_lab5()
