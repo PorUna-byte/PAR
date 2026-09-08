@@ -1,0 +1,13 @@
+{
+  "tokenizer": "google/gemma-2-2b",
+  "ultrafb_bin": {
+    "train_prefs": 32535,
+    "test_prefs": 256,
+    "train_sft": 32535
+  },
+  "hh_rlhf_helpful": {
+    "train_prefs": 43161,
+    "train_sft": 43161,
+    "test_prefs": 256
+  }
+}

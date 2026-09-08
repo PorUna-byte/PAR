@@ -1,0 +1,556 @@
+{
+  "source_pdf": "gemma2-2b_ultrafb_bin_curve_lab1.pdf",
+  "extraction_note": "Values were digitized from the vector paths in the PDF figure. Solid lines are proxy_reward using the left y-axis; dashed lines are winrate using the right y-axis. Steps and values are rounded from the extracted vector coordinates.",
+  "curves": [
+    {
+      "curve": "Vanilla",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.5097,
+          "winrate": 0.4811
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 4.0122,
+          "winrate": 0.5498
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 4.9929,
+          "winrate": 0.629
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 6.0046,
+          "winrate": 0.629
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 7.4406,
+          "winrate": 0.4769
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 9.0246,
+          "winrate": 0.0936
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 10.7052,
+          "winrate": 0.0102
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 11.697,
+          "winrate": 0.0061
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 11.6555,
+          "winrate": 0.004
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 10.3694,
+          "winrate": 0.0019
+        }
+      ]
+    },
+    {
+      "curve": "WARM",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": -0.3588,
+          "winrate": 0.4998
+        },
+        {
+          "step": 3232,
+          "proxy_reward": -0.3464,
+          "winrate": 0.5291
+        },
+        {
+          "step": 6464,
+          "proxy_reward": -0.3066,
+          "winrate": 0.5018
+        },
+        {
+          "step": 9696,
+          "proxy_reward": -0.2508,
+          "winrate": 0.5565
+        },
+        {
+          "step": 12928,
+          "proxy_reward": -0.1842,
+          "winrate": 0.6111
+        },
+        {
+          "step": 16160,
+          "proxy_reward": -0.1203,
+          "winrate": 0.6463
+        },
+        {
+          "step": 19392,
+          "proxy_reward": -0.1101,
+          "winrate": 0.6248
+        },
+        {
+          "step": 22624,
+          "proxy_reward": -0.0881,
+          "winrate": 0.6287
+        },
+        {
+          "step": 25856,
+          "proxy_reward": -0.0437,
+          "winrate": 0.6385
+        },
+        {
+          "step": 29088,
+          "proxy_reward": -0.017,
+          "winrate": 0.5897
+        }
+      ]
+    },
+    {
+      "curve": "ODIN",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 0.3441,
+          "winrate": 0.4977
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 0.4861,
+          "winrate": 0.5415
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 0.9633,
+          "winrate": 0.6602
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 1.4087,
+          "winrate": 0.6769
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 1.7882,
+          "winrate": 0.5852
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 2.4009,
+          "winrate": 0.3831
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 2.8798,
+          "winrate": 0.1123
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 3.1893,
+          "winrate": 0.0311
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 3.3425,
+          "winrate": 0.0144
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 3.5306,
+          "winrate": 0.0019
+        }
+      ]
+    },
+    {
+      "curve": "Reg",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 0.1276,
+          "winrate": 0.5081
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 0.3984,
+          "winrate": 0.5436
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 1.0315,
+          "winrate": 0.6519
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 1.6795,
+          "winrate": 0.654
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 2.2637,
+          "winrate": 0.5144
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 2.9647,
+          "winrate": 0.2581
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 3.541,
+          "winrate": 0.0665
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 3.9094,
+          "winrate": 0.0123
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 4.2991,
+          "winrate": 0.0061
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 4.5986,
+          "winrate": 0.004
+        }
+      ]
+    },
+    {
+      "curve": "Meanstd",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.5097,
+          "winrate": 0.4998
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 3.949,
+          "winrate": 0.5623
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 4.8795,
+          "winrate": 0.6227
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 6.018,
+          "winrate": 0.6748
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 6.8876,
+          "winrate": 0.5165
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 8.1753,
+          "winrate": 0.3519
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 9.3663,
+          "winrate": 0.0352
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 9.9893,
+          "winrate": 0.0206
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 10.629,
+          "winrate": 0.0144
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 10.7555,
+          "winrate": 0.0061
+        }
+      ]
+    },
+    {
+      "curve": "Clip",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.5097,
+          "winrate": 0.4998
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 3.9668,
+          "winrate": 0.5373
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 4.9731,
+          "winrate": 0.6144
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 6.0686,
+          "winrate": 0.6644
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 7.0006,
+          "winrate": 0.5311
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 8.0231,
+          "winrate": 0.2977
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 9.0943,
+          "winrate": 0.029
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 10.0327,
+          "winrate": 0.0102
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 10.4134,
+          "winrate": 0.0061
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 10.5392,
+          "winrate": 0.0019
+        }
+      ]
+    },
+    {
+      "curve": "Minmax",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.5097,
+          "winrate": 0.4811
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 3.7724,
+          "winrate": 0.5436
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 4.1964,
+          "winrate": 0.5811
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 4.5712,
+          "winrate": 0.6206
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 4.9384,
+          "winrate": 0.6227
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 5.1601,
+          "winrate": 0.6061
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 5.4976,
+          "winrate": 0.6727
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 5.617,
+          "winrate": 0.6498
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 5.7025,
+          "winrate": 0.6373
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 5.8567,
+          "winrate": 0.6456
+        }
+      ]
+    },
+    {
+      "curve": "LSC",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.4906,
+          "winrate": 0.4852
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 3.8884,
+          "winrate": 0.5436
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 4.6323,
+          "winrate": 0.6269
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 5.4537,
+          "winrate": 0.6831
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 5.9757,
+          "winrate": 0.6936
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 6.4754,
+          "winrate": 0.6081
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 6.5943,
+          "winrate": 0.5561
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 6.9438,
+          "winrate": 0.5686
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 6.9491,
+          "winrate": 0.5165
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 7.2124,
+          "winrate": 0.4873
+        }
+      ]
+    },
+    {
+      "curve": "PAR",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.4906,
+          "winrate": 0.4936
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 3.7172,
+          "winrate": 0.5373
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 4.0707,
+          "winrate": 0.5769
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 4.8263,
+          "winrate": 0.629
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 5.418,
+          "winrate": 0.6373
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 5.6053,
+          "winrate": 0.6769
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 5.7835,
+          "winrate": 0.7165
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 5.9063,
+          "winrate": 0.6831
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 5.8092,
+          "winrate": 0.6602
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 6.188,
+          "winrate": 0.6748
+        }
+      ]
+    },
+    {
+      "curve": "SgFc",
+      "points": [
+        {
+          "step": 0,
+          "proxy_reward": 3.4906,
+          "winrate": 0.4811
+        },
+        {
+          "step": 3240,
+          "proxy_reward": 3.6839,
+          "winrate": 0.4956
+        },
+        {
+          "step": 6480,
+          "proxy_reward": 3.9976,
+          "winrate": 0.5644
+        },
+        {
+          "step": 9720,
+          "proxy_reward": 4.3408,
+          "winrate": 0.6144
+        },
+        {
+          "step": 12960,
+          "proxy_reward": 4.8289,
+          "winrate": 0.6498
+        },
+        {
+          "step": 16200,
+          "proxy_reward": 5.4467,
+          "winrate": 0.6769
+        },
+        {
+          "step": 19440,
+          "proxy_reward": 5.9334,
+          "winrate": 0.6852
+        },
+        {
+          "step": 22680,
+          "proxy_reward": 6.2066,
+          "winrate": 0.6373
+        },
+        {
+          "step": 25920,
+          "proxy_reward": 6.5982,
+          "winrate": 0.5811
+        },
+        {
+          "step": 29160,
+          "proxy_reward": 6.8723,
+          "winrate": 0.5081
+        }
+      ]
+    }
+  ]
+}

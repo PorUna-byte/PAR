@@ -1,0 +1,25 @@
+# ── Datasets (regenerate: python data/download_datasets.py) ──────────────
+data/hh-rlhf-helpful/
+data/ultrafb_bin/
+
+# ── Base model weights (regenerate: python src/scripts/download_*.py) ────
+models_ck/
+
+# ── Run artifacts ────────────────────────────────────────────────────────
+exp_runs/
+pipeline_state/
+logs/
+log_outputs/
+results/
+wandb/
+
+# ── Local credentials: never commit ──────────────────────────────────────
+src/utils/secret.py
+.env
+
+# ── Caches / editor state ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+__MACOSX/
+.DS_Store
+.claude/

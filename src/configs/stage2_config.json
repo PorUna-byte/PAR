@@ -1,0 +1,30 @@
+{
+    "gradient_accumulation_steps": 1,
+    "bfloat16": {
+        "enabled": true
+    },
+    "optimizer": {
+        "type": "AdamW",
+        "params": {
+            "lr": 5e-6
+        }
+    },
+    "scheduler": {
+        "type": "WarmupLR",
+        "params": {
+            "warmup_min_lr": 0,
+            "warmup_max_lr": 5e-6,
+            "warmup_num_steps": 100
+        }
+    },
+    "zero_optimization": {
+        "stage": 2,
+        "allgather_partitions": true,
+        "allgather_bucket_size": 2e9,
+        "overlap_comm": true,
+        "contiguous_gradients": true,
+        "reduce_scatter": true,
+        "reduce_bucket_size": 2e9
+    },
+    "wall_clock_breakdown": false
+}

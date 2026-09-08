@@ -1,0 +1,51 @@
+{
+  "source": "User-provided Proxy Reward and Winrate vs. Steps figure",
+  "extraction_note": "Values were visually digitized from marker positions in the provided raster figure. Solid circle curves are proxy_reward values read from the left y-axis. Dashed x-marker curves are winrate values read from the right y-axis. Steps and values are approximate. Because the final WARM proxy-reward marker is obscured by the legend, its value is imputed by repeating the preceding value (-0.11).",
+  "curves": [
+    {
+      "curve": "WARM",
+      "points": [
+        {"step": 0, "proxy_reward": -0.51, "winrate": 0.500},
+        {"step": 6500, "proxy_reward": -0.48, "winrate": 0.487},
+        {"step": 13000, "proxy_reward": -0.40, "winrate": 0.550},
+        {"step": 19500, "proxy_reward": -0.33, "winrate": 0.562},
+        {"step": 26000, "proxy_reward": -0.25, "winrate": 0.617},
+        {"step": 32500, "proxy_reward": -0.24, "winrate": 0.617},
+        {"step": 39000, "proxy_reward": -0.21, "winrate": 0.593},
+        {"step": 45500, "proxy_reward": -0.15, "winrate": 0.575},
+        {"step": 52000, "proxy_reward": -0.11, "winrate": 0.463},
+        {"step": 58500, "proxy_reward": -0.11, "winrate": 0.222}
+      ]
+    },
+    {
+      "curve": "Minmax",
+      "points": [
+        {"step": 0, "proxy_reward": 3.50, "winrate": 0.495},
+        {"step": 6500, "proxy_reward": 4.20, "winrate": 0.572},
+        {"step": 13000, "proxy_reward": 4.90, "winrate": 0.657},
+        {"step": 19500, "proxy_reward": 5.35, "winrate": 0.628},
+        {"step": 26000, "proxy_reward": 5.70, "winrate": 0.683},
+        {"step": 32500, "proxy_reward": 5.95, "winrate": 0.659},
+        {"step": 39000, "proxy_reward": 6.05, "winrate": 0.628},
+        {"step": 45500, "proxy_reward": 6.40, "winrate": 0.592},
+        {"step": 52000, "proxy_reward": 7.35, "winrate": 0.303},
+        {"step": 58500, "proxy_reward": 7.55, "winrate": 0.268}
+      ]
+    },
+    {
+      "curve": "PAR",
+      "points": [
+        {"step": 0, "proxy_reward": 3.50, "winrate": 0.472},
+        {"step": 6500, "proxy_reward": 4.45, "winrate": 0.625},
+        {"step": 13000, "proxy_reward": 5.45, "winrate": 0.685},
+        {"step": 19500, "proxy_reward": 5.78, "winrate": 0.700},
+        {"step": 26000, "proxy_reward": 6.08, "winrate": 0.650},
+        {"step": 32500, "proxy_reward": 6.20, "winrate": 0.692},
+        {"step": 39000, "proxy_reward": 6.20, "winrate": 0.700},
+        {"step": 45500, "proxy_reward": 6.30, "winrate": 0.676},
+        {"step": 52000, "proxy_reward": 6.30, "winrate": 0.687},
+        {"step": 58500, "proxy_reward": 6.33, "winrate": 0.669}
+      ]
+    }
+  ]
+}
