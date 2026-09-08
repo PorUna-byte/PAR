@@ -465,10 +465,14 @@ for each role (policy / reference / reward / critic) is selected in
 <!-- TODO: replace with the published reference. -->
 
 ```bibtex
-@misc{par,
-  title  = {Reward Shaping to Mitigate Reward Hacking in RLHF},
-  author = {TODO},
-  year   = {2025}
+@misc{fu2026rewardshapingmitigatereward,
+      title={Reward Shaping to Mitigate Reward Hacking in RLHF}, 
+      author={Jiayi Fu and Xuandong Zhao and Chengyuan Yao and Qi Han and Yuxia Wang},
+      year={2026},
+      eprint={2502.18770},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2502.18770}, 
 }
 ```
 
